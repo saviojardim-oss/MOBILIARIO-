@@ -28,6 +28,12 @@
         tr:nth-child(even) { background-color: #f8fafc; }
         tr:hover { background-color: #f1f5f9; }
 
+        /* Botão Carregar Mais - Forçado Visível */
+        .btn-container { text-align: center; margin: 25px 0; display: block !important; }
+        .btn-carregar { background-color: #1e3a8a; color: white; border: none; padding: 14px 28px; font-size: 14px; font-weight: 600; border-radius: 6px; cursor: pointer; transition: background 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block !important; }
+        .btn-carregar:hover { background-color: #1d4ed8; }
+        .btn-carregar:disabled { background-color: #cbd5e1; color: #94a3b8; cursor: not-allowed; box-shadow: none; }
+
         .sem-resultados { text-align: center; padding: 40px; color: #94a3b8; font-style: italic; }
         .carregando { text-align: center; padding: 20px; color: #3b82f6; font-weight: bold; }
     </style>
@@ -101,11 +107,18 @@
                 </tbody>
         </table>
     </div>
+    
+    <div class="btn-container">
+        <button id="btn-mais" class="btn-carregar">Carregar mais resultados</button>
+    </div>
+
     <div id="status-mensagem" class="carregando">Buscando arquivo de dados...</div>
 </div>
 
 <script>
     let dadosContribuientes = [];
+    let dadosFiltrados = [];
+    let limiteAtual = 100;
 
     // Lendo o arquivo 'dados.csv' usando PapaParse
     Papa.parse('dados.csv', {
@@ -115,12 +128,12 @@
         delimiter: ";", 
         complete: function(results) {
             dadosContribuientes = results.data;
+            dadosFiltrados = dadosContribuientes;
             
-            // Ativa os campos de busca após o carregamento
             document.querySelectorAll('.filtro-input').forEach(input => input.disabled = false);
             document.getElementById('status-mensagem').style.display = 'none';
             
-            exibirDados(dadosContribuientes.slice(0, 100), dadosContribuientes.length);
+            processarPaginacao();
         },
         error: function(err) {
             console.error("Erro ao ler o CSV:", err);
@@ -129,14 +142,28 @@
         }
     });
 
-    // Renderizar linhas na tabela mapeando rigorosamente as novas colunas
-    function exibirDados(lista, totalGeral = null) {
+    // Controla e exibe dados fatiados (Paginação)
+    function processarPaginacao() {
+        const fatiados = dadosFiltrados.slice(0, limiteAtual);
+        exibirDados(fatiados, dadosFiltrados.length);
+
+        const btn = document.getElementById('btn-mais');
+        if (limiteAtual >= dadosFiltrados.length) {
+            btn.disabled = true;
+            btn.innerText = "Fim dos registros";
+        } else {
+            btn.disabled = false;
+            btn.innerText = `Carregar mais 100 resultados (Mostrando ${fatiados.length} de ${dadosFiltrados.length})`;
+        }
+    }
+
+    // Renderizar linhas na tabela
+    function exibirDados(lista, totalFiltrado) {
         const corpoTabela = document.getElementById('corpo-tabela');
         const contador = document.getElementById('contador-resultados');
         corpoTabela.innerHTML = "";
         
-        let totalExibido = totalGeral !== null ? totalGeral : lista.length;
-        contador.innerText = `${totalExibido} registro(s) encontrado(s).` + (lista.length === 100 ? " (Exibindo as primeiras 100 linhas correspondentes)" : "");
+        contador.innerText = `${totalFiltrado} registro(s) encontrado(s) no total de buscas.`;
 
         if (lista.length === 0) {
             corpoTabela.innerHTML = `<tr><td colspan="29" class="sem-resultados">Nenhum registro encontrado para os filtros aplicados.</td></tr>`;
@@ -145,8 +172,6 @@
 
         lista.forEach(item => {
             const tr = document.createElement('tr');
-            
-            // Função auxiliar para aceitar chaves em maiúsculo ou minúsculo vindas do CSV
             const pegarValor = (campo) => item[campo.toLowerCase()] || item[campo.toUpperCase()] || '-';
 
             tr.innerHTML = `
@@ -184,7 +209,6 @@
         });
     }
 
-    // Função que combina os múltiplos filtros e executa a busca refinada
     function executarFiltros() {
         const fNome = document.getElementById('filtro-nome').value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const fDoc = document.getElementById('filtro-doc').value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -192,12 +216,9 @@
         const fBairro = document.getElementById('filtro-bairro').value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const fSituacao = document.getElementById('filtro-situacao').value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-        if (!fNome && !fDoc && !fInsc && !fBairro && !fSituacao) {
-            exibirDados(dadosContribuientes.slice(0, 100), dadosContribuientes.length);
-            return;
-        }
+        limiteAtual = 100;
 
-        const filtrados = dadosContribuientes.filter(item => {
+        dadosFiltrados = dadosContribuientes.filter(item => {
             const nome = ((item['nome'] || item['NOME'] || '') + ' ' + (item['nomefantasia'] || item['NOMEFANTASIA'] || '')).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             const doc = (item['cgccpf'] || item['CGCCPF'] || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             const insc = (item['inscrmunicipal'] || item['INSCRMUNICIPAL'] || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -211,10 +232,14 @@
                    situacao.includes(fSituacao);
         });
 
-        exibirDados(filtrados.slice(0, 100), filtrados.length);
+        processarPaginacao();
     }
 
-    // Escuta a digitação em qualquer um dos campos de filtro
+    document.getElementById('btn-mais').addEventListener('click', () => {
+        limiteAtual += 100;
+        processarPaginacao();
+    });
+
     document.querySelectorAll('.filtro-input').forEach(input => {
         input.addEventListener('input', executarFiltros);
     });
