@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Consulta Completa Mobiliario</title>
+    <title>Consulta Avançada de Contribuintes</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -11,12 +11,12 @@
         .container { max-width: 100%; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
         h1 { color: #1e3a8a; margin-top: 0; font-size: 24px; text-align: center; margin-bottom: 6px; }
         
-        /* Estilo da observação de navegação */
+        /* Estilo da nova observação de navegação */
         .dica-maps { text-align: center; color: #475569; font-size: 14px; margin-bottom: 25px; font-weight: 400; display: flex; align-items: center; justify-content: center; gap: 6px; }
         .dica-maps span { color: #1e3a8a; font-weight: 600; }
 
         /* Painel de Filtros Avançados */
-        .filtros-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; background: #f1f5f9; padding: 15px; border-radius: 8px; }
+        .filtros-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; background: #f1f5f9; padding: 15px; border-radius: 8px; }
         .grupo-filtro { display: flex; flex-direction: column; }
         .grupo-filtro label { font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px; }
         .filtro-input { padding: 8px 12px; font-size: 14px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; transition: all 0.2s; }
@@ -24,7 +24,7 @@
         
         .contador { text-align: center; color: #64748b; font-size: 14px; margin-bottom: 15px; font-weight: 500; }
 
-        /* Tabela Estruturada com Rolagem Horizontal */
+        /* Tabela Estruturada */
         .table-responsive { overflow-x: auto; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; max-height: 550px; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
         th { background-color: #1e3a8a; color: white; padding: 12px 10px; font-weight: 600; position: sticky; top: 0; z-index: 10; white-space: nowrap; }
@@ -34,4 +34,96 @@
 
         /* Estilo do ícone do mapa com efeito de zoom */
         .link-maps { text-decoration: none; font-size: 14px; display: inline-block; transition: transform 0.2s; cursor: pointer; margin-left: 5px; }
-        .link-maps:hover {
+        .link-maps:hover { transform: scale(1.3); }
+
+        .sem-resultados { text-align: center; padding: 40px; color: #94a3b8; font-style: italic; }
+        .carregando { text-align: center; padding: 20px; color: #3b82f6; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📋 Painel de Consulta de Contribuintes</h1>
+    
+    <div class="dica-maps">💡 <span>Dica de Navegação:</span> Para abrir a localização no Google Maps em uma nova aba, basta clicar no ícone 📍 ao lado do logradouro.</div>
+    
+    <div class="filtros-grid">
+        <div class="grupo-filtro">
+            <label>Nome / Razão Social</label>
+            <input type="text" id="filtro-nome" class="filtro-input" placeholder="Filtrar por nome..." disabled>
+        </div>
+        <div class="grupo-filtro">
+            <label>CPF / CNPJ</label>
+            <input type="text" id="filtro-doc" class="filtro-input" placeholder="Filtrar por documento..." disabled>
+        </div>
+        <div class="grupo-filtro">
+            <label>Bairro</label>
+            <input type="text" id="filtro-bairro" class="filtro-input" placeholder="Filtrar por bairro..." disabled>
+        </div>
+        <div class="grupo-filtro">
+            <label>Cidade</label>
+            <input type="text" id="filtro-cidade" class="filtro-input" placeholder="Filtrar por cidade..." disabled>
+        </div>
+    </div>
+    
+    <div id="contador-resultados" class="contador"></div>
+
+    <div class="table-responsive">
+        <table id="tabela-resultados">
+            <thead>
+                <tr>
+                    <th>Nome / Razão Social</th>
+                    <th>CPF / CNPJ</th>
+                    <th>RG / Inscr. Estadual</th>
+                    <th>Estado</th>
+                    <th>Cidade</th>
+                    <th>Bairro</th>
+                    <th>Logradouro</th>
+                    <th>Nº</th>
+                    <th>CEP</th>
+                    <th>Complemento</th>
+                    <th>E-mail</th>
+                    <th>Telefones</th>
+                </tr>
+            </thead>
+            <tbody id="corpo-tabela">
+            </tbody>
+        </table>
+    </div>
+    <div id="status-mensagem" class="carregando">Buscando arquivo de contribuintes...</div>
+</div>
+
+<script>
+    let dadosContribuientes = [];
+
+    // Lendo o arquivo 'dados.csv' usando PapaParse com caminho relativo compatível com GitHub Pages
+    Papa.parse('./dados.csv', {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        delimiter: ";", 
+        complete: function(results) {
+            dadosContribuientes = results.data;
+            
+            // Ativa os campos de busca após o carregamento
+            document.querySelectorAll('.filtro-input').forEach(input => input.disabled = false);
+            document.getElementById('status-mensagem').style.display = 'none';
+            
+            // Aciona a filtragem inicial para exibir os dados
+            executarFiltros();
+        },
+        error: function(err) {
+            console.error("Erro ao carregar o CSV:", err);
+            document.getElementById('status-mensagem').innerText = "Erro ao carregar o arquivo 'dados.csv'. Verifique o arquivo.";
+            document.getElementById('status-mensagem').style.color = "red";
+        }
+    });
+
+    // Função que renderiza a tabela na tela e gera o link do Google Maps
+    function exibirDados(lista) {
+        const corpoTabela = document.getElementById('corpo-tabela');
+        const contador = document.getElementById('contador-resultados');
+        corpoTabela.innerHTML = '';
+
+        if (lista.length === 0) {
+            corpoTabela.innerHTML = `<tr><td colspan="1
