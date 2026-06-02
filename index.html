@@ -3,228 +3,197 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Consulta de Cadastro Mobiliário</title>
+    <title>Sistema de Consulta de Contribuintes e Empresas</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { background-color: #f8f9fa; margin: 0; padding: 20px 15px; color: #333; }
+        body { background-color: #f8f9fa; margin: 0; padding: 30px 15px; color: #333; }
         .container { max-width: 100%; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        h1 { color: #1e3a8a; margin-top: 0; font-size: 24px; text-align: center; margin-bottom: 20px; }
+        h1 { color: #1e3a8a; margin-top: 0; font-size: 24px; text-align: center; margin-bottom: 6px; }
         
-        /* Painel de Filtros Avançados */
-        .filtros-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; background: #f1f5f9; padding: 15px; border-radius: 8px; }
-        .grupo-filtro { display: flex; flex-direction: column; }
-        .grupo-filtro label { font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px; }
-        .filtro-input { padding: 8px 12px; font-size: 14px; border: 1px solid #cbd5e1; border-radius: 6px; outline: none; transition: all 0.2s; }
-        .filtro-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
+        .dica-maps { text-align: center; color: #475569; font-size: 14px; margin-bottom: 25px; font-weight: 400; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .dica-maps span { color: #1e3a8a; font-weight: 600; }
+
+        .search-container { position: relative; max-width: 600px; margin: 0 auto 25px auto; }
+        .search-box { width: 100%; padding: 14px 20px; font-size: 16px; border: 2px solid #cbd5e1; border-radius: 30px; outline: none; transition: all 0.3s; }
+        .search-box:focus { border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15); }
         
         .contador { text-align: center; color: #64748b; font-size: 14px; margin-bottom: 15px; font-weight: 500; }
 
-        /* Tabela Estruturada com Rolagem Horizontal */
         .table-responsive { overflow-x: auto; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; max-height: 600px; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
-        th { background-color: #1e3a8a; color: white; padding: 12px 10px; font-weight: 600; position: sticky; top: 0; z-index: 10; white-space: nowrap; }
-        td { padding: 10px; border-bottom: 1px solid #e2e8f0; color: #475569; white-space: nowrap; }
+        th { background-color: #1e3a8a; color: white; padding: 12px 10px; font-weight: 600; position: sticky; top: 0; z-index: 10; }
+        td { padding: 10px; border-bottom: 1px solid #e2e8f0; color: #475569; }
         tr:nth-child(even) { background-color: #f8fafc; }
         tr:hover { background-color: #f1f5f9; }
 
+        .link-maps { color: #3b82f6; text-decoration: none; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; transition: color 0.2s; }
+        .link-maps:hover { color: #1d4ed8; text-decoration: underline; }
+
         .sem-resultados { text-align: center; padding: 40px; color: #94a3b8; font-style: italic; }
         .carregando { text-align: center; padding: 20px; color: #3b82f6; font-weight: bold; }
+        
+        .badge-situacao { padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; display: inline-block; }
+        .badge-ativo { background-color: #dcfce7; color: #166534; }
+        .badge-inativo { background-color: #fee2e2; color: #991b1b; }
+        .badge-outro { background-color: #f1f5f9; color: #475569; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>📋 Painel de Consulta - Cadastro Mobiliário</h1>
+    <h1>📋 Consulta de Contribuintes e Empresas</h1>
+    <div class="dica-maps">💡 <span>Dica de Navegação:</span> Clique sobre o alfinete (📍) ou no nome do endereço para abrir no Google Maps.</div>
     
-    <div class="filtros-grid">
-        <div class="grupo-filtro">
-            <label>Nome / Razão Social / Fantasia</label>
-            <input type="text" id="filtro-nome" class="filtro-input" placeholder="Buscar por nome..." disabled>
-        </div>
-        <div class="grupo-filtro">
-            <label>CPF / CNPJ</label>
-            <input type="text" id="filtro-doc" class="filtro-input" placeholder="Buscar por documento..." disabled>
-        </div>
-        <div class="grupo-filtro">
-            <label>Inscrição Municipal</label>
-            <input type="text" id="filtro-insc" class="filtro-input" placeholder="Buscar por inscrição..." disabled>
-        </div>
-        <div class="grupo-filtro">
-            <label>Bairro</label>
-            <input type="text" id="filtro-bairro" class="filtro-input" placeholder="Buscar por bairro..." disabled>
-        </div>
-        <div class="grupo-filtro">
-            <label>Situação</label>
-            <input type="text" id="filtro-situacao" class="filtro-input" placeholder="Ativo, Baixado, etc..." disabled>
-        </div>
+    <div class="search-container">
+        <input type="text" id="search-input" class="search-box" placeholder="Carregando base de dados (122k+ registros), aguarde..." disabled>
     </div>
     
-    <div id="contador-resultados" class="contador">Aguardando filtros de busca...</div>
+    <div id="contador-resultados" class="contador"></div>
 
     <div class="table-responsive">
         <table id="tabela-resultados">
             <thead>
                 <tr>
-                    <th>Nome / Razão Social</th>
+                    <th>Razão Social / Nome</th>
                     <th>Nome Fantasia</th>
                     <th>CPF / CNPJ</th>
-                    <th>Situação</th>
                     <th>Inscrição Municipal</th>
-                    <th>Logradouro (Endereço)</th>
+                    <th>Situação</th>
+                    <th>Tipo Empresa</th>
+                    <th>Bairro</th>
+                    <th>Logradouro (Google Maps)</th>
                     <th>Nº</th>
                     <th>Complemento</th>
                     <th>CEP</th>
-                    <th>Bairro</th>
-                    <th>Cidade</th>
-                    <th>Estado</th>
-                    <th>Tipo Lançamento</th>
-                    <th>Tipo Empresa</th>
-                    <th>CRC</th>
-                    <th>Estabelecido</th>
+                    <th>Área Ocupada (m²)</th>
                     <th>Início Atividade</th>
-                    <th>Capital Social</th>
-                    <th>Área Ocupada</th>
-                    <th>RG / Inscr. Estadual</th>
-                    <th>Tipo Pessoa</th>
-                    <th>Tipo ISS</th>
-                    <th>Atividade Livre</th>
-                    <th>Data Encerramento</th>
                     <th>Endereço Entrega</th>
-                    <th>Bairro Entrega</th>
-                    <th>Cidade Entrega</th>
-                    <th>Estado Entrega</th>
-                    <th>CEP Entrega</th>
                 </tr>
             </thead>
             <tbody id="corpo-tabela">
-                <tr><td colspan="29" class="sem-resultados">Use os campos acima para pesquisar e exibir os resultados.</td></tr>
             </tbody>
         </table>
     </div>
-
-    <div id="status-mensagem" class="carregando">Carregando base de dados mobiliária...</div>
+    <div id="status-mensagem" class="carregando">Buscando e processando arquivo CSV...</div>
 </div>
 
 <script>
-    let dadosMobiliario = [];
+    let dadosImoveis = [];
 
-    // Lendo o arquivo 'dados.csv'
+    // Lendo o arquivo 'dados.csv' usando PapaParse com delimitador correto (ponto e vírgula)
     Papa.parse('dados.csv', {
         download: true,
         header: true,
         skipEmptyLines: true,
-        delimiter: ";", 
+        delimiter: ";",
         complete: function(results) {
-            dadosMobiliario = results.data;
-
-            if (dadosMobiliario.length === 0) {
-                document.getElementById('status-mensagem').innerText = "Nenhum dado foi encontrado. Certifique-se de que o arquivo se chama exatamente 'dados.csv'.";
-                document.getElementById('status-mensagem').style.color = 'red';
-                return;
-            }
+            dadosImoveis = results.data;
             
-            // Ativa os filtros e oculta o carregando
-            document.querySelectorAll('.filtro-input').forEach(input => input.disabled = false);
+            const input = document.getElementById('search-input');
+            input.disabled = false;
+            input.placeholder = "Busque por Nome, Fantasia, CPF/CNPJ, Inscrição, Bairro...";
             document.getElementById('status-mensagem').style.display = 'none';
+            
+            // Exibe os primeiros 100 itens para o carregamento inicial instantâneo
+            exibirDados(dadosImoveis.slice(0, 100), dadosImoveis.length);
         },
         error: function(err) {
             console.error("Erro ao ler o CSV:", err);
-            document.getElementById('status-mensagem').innerText = "Erro ao carregar o arquivo CSV. Verifique se o arquivo 'dados.csv' está na pasta.";
+            document.getElementById('status-mensagem').innerText = "Erro ao carregar o arquivo CSV. Certifique-se de que o arquivo na pasta se chama exatamente 'dados.csv'.";
             document.getElementById('status-mensagem').style.color = 'red';
         }
     });
 
-    // Renderizar linhas na tabela
-    function exibirDados(lista, buscaAtiva) {
+    // Função para renderizar os dados na tabela
+    function exibirDados(lista, totalGeral = null) {
         const corpoTabela = document.getElementById('corpo-tabela');
         const contador = document.getElementById('contador-resultados');
         corpoTabela.innerHTML = "";
         
-        if (!buscaAtiva) {
-            contador.innerText = "Aguardando filtros de busca...";
-            corpoTabela.innerHTML = `<tr><td colspan="29" class="sem-resultados">Use os campos acima para pesquisar e exibir os resultados.</td></tr>`;
-            return;
-        }
-
-        contador.innerText = `${lista.length} registro(s) encontrado(s).`;
-
+        let totalExibido = totalGeral !== null ? totalGeral : lista.length;
+        
         if (lista.length === 0) {
-            corpoTabela.innerHTML = `<tr><td colspan="29" class="sem-resultados">Nenhum registro correspondente aos filtros aplicados.</td></tr>`;
+            contador.innerText = "0 registro(s) encontrado(s).";
+            corpoTabela.innerHTML = `<tr><td colspan="14" class="sem-resultados">Nenhum registro encontrado para essa busca.</td></tr>`;
             return;
         }
+
+        contador.innerText = `${totalExibido} registro(s) encontrado(s).` + (totalGeral !== null && lista.length === 100 ? " (Exibindo os primeiros 100 resultados por questões de performance)" : lista.length === 200 ? " (Exibindo os primeiros 200 resultados)" : "");
 
         lista.forEach(item => {
-            const tr = document.createElement('tr');
-            const pegarValor = (campo) => item[campo.toLowerCase().trim()] || item[campo.toUpperCase().trim()] || '-';
+            const logradouro = String(item['endereco'] || '').trim();
+            const numero = String(item['numero'] || '').trim();
+            const bairro = String(item['bairro'] || '').trim();
+            const cidade = String(item['cidade'] || 'Vila Velha').trim();
+            const estado = String(item['estado'] || 'ES').trim();
+            
+            let linkMaps = '#';
+            let targetBlank = '';
+            
+            if (logradouro) {
+                // Monta o link oficial de busca georreferenciada do Google Maps
+                const queryBusca = encodeURIComponent(`${logradouro}, ${numero} - ${bairro}, ${cidade}, ${estado}`);
+                linkMaps = `https://www.google.com/maps/search/?api=1&query=${queryBusca}`;
+                targetBlank = 'target="_blank"';
+            }
 
+            // Formatação estilizada do badge de Situação (Verde para Ativo, Vermelho para Inativo)
+            const sit = String(item['situacao'] || '').trim();
+            let classeBadge = 'badge-outro';
+            if (sit.toLowerCase() === 'ativo') classeBadge = 'badge-ativo';
+            if (sit.toLowerCase() === 'inativo') classeBadge = 'badge-inativo';
+
+            const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td><b>${pegarValor('nome')}</b></td>
-                <td>${pegarValor('nomefantasia')}</td>
-                <td>${pegarValor('cgccpf')}</td>
-                <td>${pegarValor('situacao')}</td>
-                <td>${pegarValor('inscrmunicipal')}</td>
-                <td>${pegarValor('endereco')}</td>
-                <td>${pegarValor('numero')}</td>
-                <td>${pegarValor('complemento')}</td>
-                <td>${pegarValor('cep')}</td>
-                <td>${pegarValor('bairro')}</td>
-                <td>${pegarValor('cidade')}</td>
-                <td>${pegarValor('estado')}</td>
-                <td>${pegarValor('tplancamento')}</td>
-                <td>${pegarValor('tpempresa')}</td>
-                <td>${pegarValor('crc')}</td>
-                <td>${pegarValor('estabelecido')}</td>
-                <td>${pegarValor('dtinicioatividade')}</td>
-                <td>${pegarValor('capitalsocial')}</td>
-                <td>${pegarValor('areaocupada')}</td>
-                <td>${pegarValor('rginscrestadual')}</td>
-                <td>${pegarValor('tppessoa')}</td>
-                <td>${pegarValor('tpiss')}</td>
-                <td>${pegarValor('atividadelivre')}</td>
-                <td>${pegarValor('dtencerramento')}</td>
-                <td>${pegarValor('entregaendereco')}</td>
-                <td>${pegarValor('entregabairro')}</td>
-                <td>${pegarValor('entregacidade')}</td>
-                <td>${pegarValor('entregaestado')}</td>
-                <td>${pegarValor('entregacep')}</td>
+                <td><b>${item['nome'] || '-'}</b></td>
+                <td>${item['nomefantasia'] || '-'}</td>
+                <td>${item['cgccpf'] || '-'}</td>
+                <td>${item['inscrmunicipal'] || '-'}</td>
+                <td><span class="badge-situacao ${classeBadge}">${sit || '-'}</span></td>
+                <td>${item['tpempresa'] || '-'}</td>
+                <td>${bairro || '-'}</td>
+                <td>
+                    ${logradouro ? `<a href="${linkMaps}" ${targetBlank} class="link-maps" title="Visualizar no Google Maps">📍 ${logradouro}</a>` : '-'}
+                </td>
+                <td>${numero || '-'}</td>
+                <td>${item['complemento'] || '-'}</td>
+                <td>${item['cep'] || '-'}</td>
+                <td>${item['areaocupada'] || '-'}</td>
+                <td>${item['dtinicioatividade'] || '-'}</td>
+                <td>${item['entregaendereco'] || '-'}</td>
             `;
             corpoTabela.appendChild(tr);
         });
     }
 
-    // Filtros combinados em tempo real
-    function executarFiltros() {
-        const fNome = document.getElementById('filtro-nome').value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const fDoc = document.getElementById('filtro-doc').value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const fInsc = document.getElementById('filtro-insc').value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const fBairro = document.getElementById('filtro-bairro').value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const fSituacao = document.getElementById('filtro-situacao').value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-        if (!fNome && !fDoc && !fInsc && !fBairro && !fSituacao) {
-            exibirDados([], false);
+    // Filtro de pesquisa ultra rápido ignorando acentos e maiúsculas
+    document.getElementById('search-input').addEventListener('input', (e) => {
+        const termo = e.target.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        
+        if (!termo) {
+            exibirDados(dadosImoveis.slice(0, 100), dadosImoveis.length);
             return;
         }
 
-        const filtrados = dadosMobiliario.filter(item => {
-            const nome = ((item['nome'] || item['NOME'] || '') + ' ' + (item['nomefantasia'] || item['NOMEFANTASIA'] || '')).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            const doc = (item['cgccpf'] || item['CGCCPF'] || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            const insc = (item['inscrmunicipal'] || item['INSCRMUNICIPAL'] || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            const bairro = (item['bairro'] || item['BAIRRO'] || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            const situacao = (item['situacao'] || item['SITUACAO'] || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const filtrados = dadosImoveis.filter(item => {
+            const nome = String(item['nome'] || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const fantasia = String(item['nomefantasia'] || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const documento = String(item['cgccpf'] || '').toLowerCase();
+            const inscricao = String(item['inscrmunicipal'] || '').toLowerCase();
+            const bairro = String(item['bairro'] || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const endereco = String(item['endereco'] || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-            return nome.includes(fNome) && 
-                   doc.includes(fDoc) && 
-                   insc.includes(fInsc) && 
-                   bairro.includes(fBairro) && 
-                   situacao.includes(fSituacao);
+            return nome.includes(termo) || 
+                   fantasia.includes(termo) || 
+                   documento.includes(termo) || 
+                   inscricao.includes(termo) || 
+                   bairro.includes(termo) || 
+                   endereco.includes(termo);
         });
 
-        exibirDados(filtrados, true);
-    }
-
-    document.querySelectorAll('.filtro-input').forEach(input => {
-        input.addEventListener('input', executarFiltros);
+        // Limita a exibição a no máximo 200 linhas para o navegador não travar com as buscas parciais
+        exibirDados(filtrados.slice(0, 200), filtrados.length);
     });
 </script>
 
