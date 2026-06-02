@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Consulta Mobiliario</title>
+    <title>Consulta de Cadastro Mobiliário</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -21,7 +21,7 @@
         .contador { text-align: center; color: #64748b; font-size: 14px; margin-bottom: 15px; font-weight: 500; }
 
         /* Tabela Estruturada com Rolagem Horizontal */
-        .table-responsive { overflow-x: auto; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; max-height: 550px; }
+        .table-responsive { overflow-x: auto; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; max-height: 600px; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
         th { background-color: #1e3a8a; color: white; padding: 12px 10px; font-weight: 600; position: sticky; top: 0; z-index: 10; white-space: nowrap; }
         td { padding: 10px; border-bottom: 1px solid #e2e8f0; color: #475569; white-space: nowrap; }
@@ -35,7 +35,7 @@
 <body>
 
 <div class="container">
-    <h1>📋 Painel de Consulta Mobiliario</h1>
+    <h1>📋 Painel de Consulta - Cadastro Mobiliário</h1>
     
     <div class="filtros-grid">
         <div class="grupo-filtro">
@@ -60,7 +60,7 @@
         </div>
     </div>
     
-    <div id="contador-resultados" class="contador"></div>
+    <div id="contador-resultados" class="contador">Aguardando filtros de busca...</div>
 
     <div class="table-responsive">
         <table id="tabela-resultados">
@@ -98,56 +98,65 @@
                 </tr>
             </thead>
             <tbody id="corpo-tabela">
-                </tbody>
+                <tr><td colspan="29" class="sem-resultados">Use os campos acima para pesquisar e exibir os resultados.</td></tr>
+            </tbody>
         </table>
     </div>
-    <div id="status-mensagem" class="carregando">Buscando arquivo de dados...</div>
+
+    <div id="status-mensagem" class="carregando">Carregando base de dados mobiliária...</div>
 </div>
 
 <script>
-    let dadosContribuientes = [];
+    let dadosMobiliario = [];
 
-    // Lendo o arquivo 'dados.csv' usando PapaParse
+    // Lendo o arquivo 'dados.csv'
     Papa.parse('dados.csv', {
         download: true,
         header: true,
         skipEmptyLines: true,
         delimiter: ";", 
         complete: function(results) {
-            dadosContribuientes = results.data;
+            dadosMobiliario = results.data;
+
+            if (dadosMobiliario.length === 0) {
+                document.getElementById('status-mensagem').innerText = "Nenhum dado foi encontrado. Certifique-se de que o arquivo se chama exatamente 'dados.csv'.";
+                document.getElementById('status-mensagem').style.color = 'red';
+                return;
+            }
             
-            // Ativa os campos de busca após o carregamento
+            // Ativa os filtros e oculta o carregando
             document.querySelectorAll('.filtro-input').forEach(input => input.disabled = false);
             document.getElementById('status-mensagem').style.display = 'none';
-            
-            exibirDados(dadosContribuientes.slice(0, 100), dadosContribuientes.length);
         },
         error: function(err) {
             console.error("Erro ao ler o CSV:", err);
-            document.getElementById('status-mensagem').innerText = "Erro ao carregar o arquivo CSV. Certifique-se de que o arquivo se chama exatamente 'dados.csv' na sua pasta.";
+            document.getElementById('status-mensagem').innerText = "Erro ao carregar o arquivo CSV. Verifique se o arquivo 'dados.csv' está na pasta.";
             document.getElementById('status-mensagem').style.color = 'red';
         }
     });
 
-    // Renderizar linhas na tabela mapeando rigorosamente as novas colunas
-    function exibirDados(lista, totalGeral = null) {
+    // Renderizar linhas na tabela
+    function exibirDados(lista, buscaAtiva) {
         const corpoTabela = document.getElementById('corpo-tabela');
         const contador = document.getElementById('contador-resultados');
         corpoTabela.innerHTML = "";
         
-        let totalExibido = totalGeral !== null ? totalGeral : lista.length;
-        contador.innerText = `${totalExibido} registro(s) encontrado(s).` + (lista.length === 100 ? " (Exibindo as primeiras 100 linhas correspondentes)" : "");
+        if (!buscaAtiva) {
+            contador.innerText = "Aguardando filtros de busca...";
+            corpoTabela.innerHTML = `<tr><td colspan="29" class="sem-resultados">Use os campos acima para pesquisar e exibir os resultados.</td></tr>`;
+            return;
+        }
+
+        contador.innerText = `${lista.length} registro(s) encontrado(s).`;
 
         if (lista.length === 0) {
-            corpoTabela.innerHTML = `<tr><td colspan="29" class="sem-resultados">Nenhum registro encontrado para os filtros aplicados.</td></tr>`;
+            corpoTabela.innerHTML = `<tr><td colspan="29" class="sem-resultados">Nenhum registro correspondente aos filtros aplicados.</td></tr>`;
             return;
         }
 
         lista.forEach(item => {
             const tr = document.createElement('tr');
-            
-            // Função auxiliar para aceitar chaves em maiúsculo ou minúsculo vindas do CSV
-            const pegarValor = (campo) => item[campo.toLowerCase()] || item[campo.toUpperCase()] || '-';
+            const pegarValor = (campo) => item[campo.toLowerCase().trim()] || item[campo.toUpperCase().trim()] || '-';
 
             tr.innerHTML = `
                 <td><b>${pegarValor('nome')}</b></td>
@@ -184,7 +193,7 @@
         });
     }
 
-    // Função que combina os múltiplos filtros e executa a busca refinada
+    // Filtros combinados em tempo real
     function executarFiltros() {
         const fNome = document.getElementById('filtro-nome').value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const fDoc = document.getElementById('filtro-doc').value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -193,11 +202,11 @@
         const fSituacao = document.getElementById('filtro-situacao').value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
         if (!fNome && !fDoc && !fInsc && !fBairro && !fSituacao) {
-            exibirDados(dadosContribuientes.slice(0, 100), dadosContribuientes.length);
+            exibirDados([], false);
             return;
         }
 
-        const filtrados = dadosContribuientes.filter(item => {
+        const filtrados = dadosMobiliario.filter(item => {
             const nome = ((item['nome'] || item['NOME'] || '') + ' ' + (item['nomefantasia'] || item['NOMEFANTASIA'] || '')).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             const doc = (item['cgccpf'] || item['CGCCPF'] || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             const insc = (item['inscrmunicipal'] || item['INSCRMUNICIPAL'] || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -211,10 +220,9 @@
                    situacao.includes(fSituacao);
         });
 
-        exibirDados(filtrados.slice(0, 100), filtrados.length);
+        exibirDados(filtrados, true);
     }
 
-    // Escuta a digitação em qualquer um dos campos de filtro
     document.querySelectorAll('.filtro-input').forEach(input => {
         input.addEventListener('input', executarFiltros);
     });
